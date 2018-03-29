@@ -13,15 +13,43 @@ open Rosdex.Services.ProductManager.HttpHandlers
 // Web app
 // ---------------------------------
 
+let logInput : HttpHandler =
+    fun next ctx -> task {
+        sprintf "At %O: %O | %O | %O"
+            System.DateTime.Now
+            ctx.Request.Method
+            ctx.Request.Path
+            ctx.Request.QueryString
+        |> ctx.GetLogger("io").LogDebug
+        return! next ctx
+        }
+
+let logOutput : HttpHandler =
+    fun next ctx -> task {
+        let! result = next ctx
+        result
+        |> Option.iter (fun p ->
+            sprintf "At %O: %O | %O | %O"
+                System.DateTime.Now
+                p.Response.StatusCode
+                p.Response.ContentType
+                p.Response.ContentLength
+            |> ctx.GetLogger("io").LogDebug)
+        return result
+        }
+
 let webApp =
-    choose [
-        subRoute "/api"
-            (choose [
+    logInput
+    >=> logOutput
+    >=> choose [
+        subRoute "/api" (
+            choose [
                 GET >=> choose [
                     route "/hello" >=> handleGetHello
                 ]
             ])
-        setStatusCode 404 >=> text "Not Found" ]
+        setStatusCode 404 >=> text "Not Found"
+    ]
 
 // ---------------------------------
 // Error handler
@@ -66,7 +94,12 @@ let configureServices (services : IServiceCollection) =
     Configuration.useFSharpLuJson services
 
 let configureLogging (builder : ILoggingBuilder) =
-    let filter (l : LogLevel) = l.Equals LogLevel.Error
+    let filter name logLevel =
+        match logLevel, name with
+        | LogLevel.Error, _
+        | LogLevel.Debug, "io"
+            -> true
+        | _ -> false
     builder.AddFilter(filter).AddConsole().AddDebug() |> ignore
 
 [<EntryPoint>]

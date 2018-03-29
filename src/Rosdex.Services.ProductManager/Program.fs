@@ -49,9 +49,21 @@ let configureApp (app : IApplicationBuilder) =
         .UseCors(configureCors)
         .UseGiraffe(webApp)
 
+module Configuration =
+    open Microsoft.FSharpLu.Json
+    open Giraffe.Serialization.Json
+
+    let useFSharpLuJson (services : IServiceCollection) =
+        Compact.Internal.Settings.settings
+        |> NewtonsoftJsonSerializer
+        |> services.AddSingleton<IJsonSerializer>
+        |> ignore
+
 let configureServices (services : IServiceCollection) =
     services.AddCors()    |> ignore
     services.AddGiraffe() |> ignore
+
+    Configuration.useFSharpLuJson services
 
 let configureLogging (builder : ILoggingBuilder) =
     let filter (l : LogLevel) = l.Equals LogLevel.Error

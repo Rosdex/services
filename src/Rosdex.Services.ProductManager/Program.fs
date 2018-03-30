@@ -47,7 +47,7 @@ let webApp =
     >=> choose [
         subRoute "/api" (
             choose [
-                subRoute "/products" (ProductsManager.endpoint jobStorageApi)
+                subRoute "/products/cards-building" (ProductsManager.CardsBuilding.endpoint jobStorageApi)
                 GET >=> choose [
                     route "/hello" >=> handleGetHello
                 ]

@@ -8,8 +8,8 @@ type Message =
 
 open Rosdex.Services.ProductManager.Domain
 
-type Job = CardBuilding.Job
-type State = CardBuilding.State
+type Job = CardsBuilding.Job
+type State = CardsBuilding.State
 
 type JobStorageApi = {
     GetAll :
@@ -25,7 +25,7 @@ type JobStorageApi = {
     //      -> CardBuilding.Job option Async
     TryUpdate :
         // TODO: Error
-        JobId -> CardBuilding.State -> CardBuilding.Job option Async
+        JobId -> CardsBuilding.State -> CardsBuilding.Job option Async
 }
 
 module AgentHelpers =

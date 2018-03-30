@@ -18,46 +18,47 @@ module HttpHandlers =
 
     module ProductsManager =
 
-        let handlePostProducts storageApi offers : HttpHandler =
-            fun next ctx -> task {
-                let! response =
-                    storageApi.CreateNew offers
-                    |> Async.StartAsTask
-                return! json response next ctx
-                }
-        let handleGetAllProducts storageApi : HttpHandler =
-            fun next ctx -> task {
-                let! response =
-                    storageApi.GetAll ()
-                    |> Async.StartAsTask
-                return! json response next ctx
-                }
-        let handleGetProduct storageApi id : HttpHandler =
-            fun next ctx -> task {
-                let! response =
-                    storageApi.TryGet id
-                    |> Async.StartAsTask
-                match response with
-                | Some p ->
-                    return! json p next ctx
-                | None ->
-                    // TODO: ?
-                    return! json { Text = "Not found" } next ctx
-                }
+        module CardsBuilding =
+            let handlePostProducts storageApi offers : HttpHandler =
+                fun next ctx -> task {
+                    let! response =
+                        storageApi.CreateNew offers
+                        |> Async.StartAsTask
+                    return! json response next ctx
+                    }
+            let handleGetAllProducts storageApi : HttpHandler =
+                fun next ctx -> task {
+                    let! response =
+                        storageApi.GetAll ()
+                        |> Async.StartAsTask
+                    return! json response next ctx
+                    }
+            let handleGetProduct storageApi id : HttpHandler =
+                fun next ctx -> task {
+                    let! response =
+                        storageApi.TryGet id
+                        |> Async.StartAsTask
+                    match response with
+                    | Some p ->
+                        return! json p next ctx
+                    | None ->
+                        // TODO: ?
+                        return! json { Text = "Not found" } next ctx
+                    }
 
-        let endpoint storageApi =
-            choose [
-                GET >=> choose [
-                    routef "/%s" (
+            let endpoint storageApi =
+                choose [
+                    GET >=> choose [
+                        routef "/%s" (
+                            // TODO: Handle error
+                            System.Guid.Parse
+                            >> handleGetProduct storageApi)
+                        // TODO: Кошерно ли это?
+                        route ""
+                            >=> handleGetAllProducts storageApi
+                    ]
+                    POST
+                        >=> route ""
                         // TODO: Handle error
-                        System.Guid.Parse
-                        >> handleGetProduct storageApi)
-                    // TODO: Кошерно ли это?
-                    route ""
-                        >=> handleGetAllProducts storageApi
+                        >=> bindJson<Offer list> (handlePostProducts storageApi)
                 ]
-                POST
-                    >=> route ""
-                    // TODO: Handle error
-                    >=> bindJson<Offer list> (handlePostProducts storageApi)
-            ]

@@ -35,7 +35,7 @@ module Job =
 
     let state { Job.State = state } = state
 
-module CardBuilding =
+module CardsBuilding =
 
     type CreatedJob = {
         Input : Offer list

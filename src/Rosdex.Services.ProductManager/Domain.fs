@@ -1,4 +1,4 @@
-﻿namespace Rosdex.Services.ProductMananger.Domain
+﻿namespace Rosdex.Services.ProductManager.Domain
 
 type CategoryId = int
 
@@ -19,32 +19,37 @@ type Offer = {
 
 type JobId = System.Guid
 
-type Job = {
+type JobInfo = {
     Id : JobId
     CreatedAt : System.DateTime
 }
 
+type 'a Job = {
+    Info : JobInfo
+    State : 'a
+}
+
 module Job =
 
-    let id { Job.Id = id } = id
+    let info { Job.Info = info } = info
 
-    // Тащить ли Job?
+    let state { Job.State = state } = state
+
+module CardBuilding =
+
     type CreatedJob = {
-        Job : Job
         Input : Offer list
     }
 
     type CategoryPredictionJobId = System.Guid
 
     type InCategoryPredictionJob = {
-        Job : Job
         InProcess : Offer list
         PredictionId : CategoryPredictionJobId
         //Processed : (Offer * CategoryId option) list
     }
 
     type CategoryPredictedJob = {
-        Job : Job
         PredictedOffers : (Offer * CategoryId option) list
     }
 
@@ -53,14 +58,16 @@ module Job =
         | Created of CreatedJob
         | JobInCategoryPrediction of InCategoryPredictionJob
         | JobWithPredictedCategory of CategoryPredictedJob
-        | Failed of Job * Message : string
+        | Failed of JobInfo * Message : string
 
-    module State =
-        let job = function
-            | Created p -> p.Job
-            | JobInCategoryPrediction p -> p.Job
-            | JobWithPredictedCategory p -> p.Job
-            | Failed (p, _) -> p
+    //module State =
+    //    let job = function
+    //        | Created p -> p.Job
+    //        | JobInCategoryPrediction p -> p.Job
+    //        | JobWithPredictedCategory p -> p.Job
+    //        | Failed (p, _) -> p
+
+    type Job = State Job
 
     //// TODO? Events?
     //type Event =
@@ -94,7 +101,6 @@ module Job =
                         job.Input
                         |> commandHanlder.SendToCategoryPrediction
                     return JobInCategoryPrediction {
-                        Job = job.Job
                         InProcess = job.Input
                         PredictionId = id
                         }
@@ -102,8 +108,7 @@ module Job =
                 |> Ok
             | _ ->
                 state
-                |> State.job
-                |> sprintf """Job (%A) state must be "Created"."""
+                |> sprintf """State (%A) must be "Created"."""
                 |> Error
 
         // TODO
@@ -117,7 +122,6 @@ module Job =
                         p.PredictionId
                         |> commandHandler.FetchCategoryPredictionResult
                     return JobWithPredictedCategory {
-                        Job = p.Job
                         PredictedOffers =
                             p.InProcess
                             |> List.map (fun p ->
@@ -126,8 +130,7 @@ module Job =
                 |> Ok
             | _ ->
                 state
-                |> State.job
-                |> sprintf """Job (%A) state must be "JobInCategoryPrediction"."""
+                |> sprintf """State (%A) must be "JobInCategoryPrediction"."""
                 |> Error
 
         let handle commandHandler state command =

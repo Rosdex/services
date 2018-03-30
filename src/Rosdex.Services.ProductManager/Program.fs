@@ -8,6 +8,7 @@ open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Rosdex.Services.ProductManager.HttpHandlers
+open Rosdex.Services.ProductManager.Models
 
 // ---------------------------------
 // Web app
@@ -38,12 +39,15 @@ let logOutput : HttpHandler =
         return result
         }
 
+let jobStorageApi = JobStorageApi.InMemory.create Map.empty
+
 let webApp =
     logInput
     >=> logOutput
     >=> choose [
         subRoute "/api" (
             choose [
+                subRoute "/products" (ProductsManager.endpoint jobStorageApi)
                 GET >=> choose [
                     route "/hello" >=> handleGetHello
                 ]

@@ -92,6 +92,8 @@ module CategoryPredictionJobSubscriber =
             loop ()
         )
 
+    type CPState = Domain.CategoryPrediction.State
+
     let rec loop intervalMs (agent : MailboxProcessor<_>) =
         async {
             do! Async.Sleep intervalMs
@@ -102,9 +104,11 @@ module CategoryPredictionJobSubscriber =
                     match job.State with
                     | State.Created _ ->
                         Some SendToCategoryPrediction
-                    // TODO Check!
-                    //| State.JobInCategoryPrediction _ ->
-                    //    Some FetchCategoryPredictionResult
+                    | State.JobInCategoryPrediction p
+                        when p.PredictionJob.State = CPState.Done ->
+                        Some FetchCategoryPredictionResult
+                    | State.JobInCategoryPrediction _ ->
+                        Some CheckCategoryPrediction
                     | _ -> None
                     // Если Job, то при малом интервале начинает забивать задачами с устаревшими данными
                     |> Option.map (fun p -> job.Info.Id, p))

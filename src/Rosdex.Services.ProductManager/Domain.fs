@@ -59,7 +59,7 @@ module CardsBuilding =
 
     type InCategoryPredictionJob = {
         InProcess : Offer list
-        PredictionId : CategoryPrediction.JobId
+        PredictionJob : CategoryPrediction.Job
         //Processed : (Offer * CategoryId option) list
     }
 
@@ -86,7 +86,10 @@ module CardsBuilding =
     type CommandHandler = {
         TrySendToCategoryPrediction :
             Offer list
-                -> CategoryPrediction.JobId option Async
+                -> CategoryPrediction.Job option Async
+        TryCheckCategoryPrediction :
+            CategoryPrediction.JobId
+                -> CategoryPrediction.Job option Async
         TryFetchCategoryPredictionResult :
             CategoryPrediction.JobId
                 -> Map<OfferId, CategoryId> option Async
@@ -95,6 +98,7 @@ module CardsBuilding =
     type Command =
         // TODO? Тащить ли Id как в примере?
         | SendToCategoryPrediction // of SubList : OfferId list
+        | CheckCategoryPrediction
         | FetchCategoryPredictionResult
 
     // TODO
@@ -103,15 +107,15 @@ module CardsBuilding =
         let handleSendToCategoryPrediction commandHanlder state = async {
             match state with
             | Created job ->
-                let! id =
+                let! predictionJob =
                     job.Input
                     |> commandHanlder.TrySendToCategoryPrediction
                 return
-                    Result.ofOption "Cannot send to predict." id
-                    |> Result.map (fun id ->
+                    Result.ofOption "Cannot send to predict." predictionJob
+                    |> Result.map (fun predictionJob ->
                         JobInCategoryPrediction {
                             InProcess = job.Input
-                            PredictionId = id
+                            PredictionJob = predictionJob
                         })
             | _ ->
                 return
@@ -120,20 +124,42 @@ module CardsBuilding =
                     |> Error
             }
 
+        let handleCheckCategoryPredictionResult commandHandler state = async {
+            match state with
+            | JobInCategoryPrediction job ->
+                // TODO: Реакции на ошибки -> Failed.
+                let! predictionJob =
+                    job.PredictionJob.Info.Id
+                    |> commandHandler.TryCheckCategoryPrediction
+                match predictionJob with
+                | Some p ->
+                    return Ok <| JobInCategoryPrediction {
+                        job with PredictionJob = p
+                    }
+                | None -> return Error ""
+            | _ ->
+                return
+                    state
+                    |> sprintf """State (%A) must be "JobInCategoryPrediction"."""
+                    |> Error
+            }
+
         // TODO
         // ? Лишние OfferId в map
         // ? Частичная обработка
         let handleFetchCategoryPredictionResult commandHandler state = async {
             match state with
-            | JobInCategoryPrediction p ->
+            | JobInCategoryPrediction job
+                when job.PredictionJob.State = CategoryPrediction.State.Done
+                ->
                 let! map =
-                    p.PredictionId
+                    job.PredictionJob.Info.Id
                     |> commandHandler.TryFetchCategoryPredictionResult
                 match map with
                 | Some map ->
                     return Ok <| JobWithPredictedCategory {
                         PredictedOffers =
-                            p.InProcess
+                            job.InProcess
                             |> List.map (fun p ->
                                 p, p.Id |> map.TryFind)
                         }
@@ -147,11 +173,14 @@ module CardsBuilding =
             }
 
         let handle commandHandler state command =
-            match command with
+            (match command with
             | SendToCategoryPrediction ->
-                handleSendToCategoryPrediction commandHandler state
+                handleSendToCategoryPrediction
+            | CheckCategoryPrediction ->
+                handleCheckCategoryPredictionResult
             | FetchCategoryPredictionResult ->
-                handleFetchCategoryPredictionResult commandHandler state
+                handleFetchCategoryPredictionResult)
+                commandHandler state
 
     type CommandHandler with
         member this.Handle state command =

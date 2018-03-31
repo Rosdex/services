@@ -317,7 +317,7 @@ module CommandHandler =
                 let! job = client.TryInit offers
                 return
                     match job with
-                    | Ok p -> Some p.Info.Id
+                    | Ok p -> Some p
                     | Error _ -> None
             }
             TryFetchCategoryPredictionResult = fun id -> async {

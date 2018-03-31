@@ -33,7 +33,7 @@ module AgentHelpers =
     type twoWay<'input, 'reply> = 'input * 'reply AsyncReplyChannel
 
 module JobStorageApi =
-    module AgentBased =
+    module AgentHelpers =
         open AgentHelpers
 
         let tuple input ch = input, ch
@@ -58,7 +58,7 @@ module JobStorageApi =
 
     // TODO: Вынести
     module InMemory =
-        open AgentBased
+        open AgentHelpers
 
         let apply dict = function
             | GetAll rc ->
@@ -123,12 +123,12 @@ module CategoryPredictionService =
             -> Result<Job, Error> Async
         TryGetResult :
             JobId
-            -> Result<(OfferId * CategoryId option) list, Error> Async
+            -> Result<(OfferId * CategoryId) list, Error> Async
     }
 
     module Client =
 
-        module AgentBased =
+        module AgentHelpers =
             open AgentHelpers
 
             type twoWayWithError<'input, 'reply> =
@@ -140,7 +140,7 @@ module CategoryPredictionService =
                 | TryGetJob of
                     twoWayWithError<JobId, Job>
                 | TryGetResult of
-                    twoWayWithError<JobId, (OfferId * CategoryId option) list>
+                    twoWayWithError<JobId, (OfferId * CategoryId) list>
 
             let ofAgent (agent : MailboxProcessor<_>) =
                 let tuple a b = a, b
@@ -159,11 +159,46 @@ module CategoryPredictionService =
                         |> agent.PostAndAsyncReply
                 }
 
-        module JsonStub =
-            open AgentBased
+        module AgentBased =
+            open AgentHelpers
             open Hopac
             open HttpFs.Client
             open Microsoft.FSharpLu.Json
+
+            module CsvOffers =
+                open Rosdex.Parser.Csv
+                open Rosdex.Parser.Csv.Operators
+
+                let offerCsvWriter : Offer CsvWriter = {
+                    CsvWriter.Config = CsvConfig.default'
+                    Fields =
+                        [
+                            (fun p -> p.Id) => "Id"
+                            (fun p -> p.Name) => "Name"
+                        ]
+                }
+
+                let serialize (stream : System.IO.TextWriter) offers =
+                    offers
+                    |> List.iter (
+                        CsvWriter.tryStringifyItem offerCsvWriter
+                        >> function
+                            | Ok p -> stream.Write p
+                            | Error _ -> ())
+
+                // TODO: ?
+                let tryExtract (stream : System.IO.Stream) =
+                    use reader = new System.IO.StreamReader(stream)
+                    try
+                        [
+                            while reader.EndOfStream do
+                                match reader.ReadLine() |> String.split ',' |> List.map int with
+                                | [id; categoryId] -> yield id, categoryId
+                                | _ -> failwith "Wrong format!"
+                        ]
+                        |> Ok
+                    with
+                        | ex -> Error ex.Message
 
             type JobSchema = {
                 id : System.Guid
@@ -201,8 +236,12 @@ module CategoryPredictionService =
             let tryInitJob endpoint offers = async {
                 let! response =
                     Request.createUrl Post endpoint
-                    // TODO: SCV
-                    |> Request.bodyString (Compact.serialize offers)
+                    // TODO: Send stream
+                    |> Request.bodyString (
+                        let stream = new System.IO.StringWriter()
+                        CsvOffers.serialize (stream) offers
+                        stream.ToString()
+                        )
                     |> tryGetResponse
                     |> Job.toAsync
                 return
@@ -242,8 +281,7 @@ module CategoryPredictionService =
                     |> Result.bind handleNetError
                     |> Result.bind (fun p ->
                         p.body
-                        |> Compact.tryDeserializeStream
-                        |> Result.ofChoice
+                        |> CsvOffers.tryExtract
                         |> Result.mapError (fun _ -> FormatError))
                 }
 
@@ -288,8 +326,6 @@ module CommandHandler =
                     match result with
                     | Ok predicted ->
                         predicted
-                        |> List.choose (fun (offer, cat) ->
-                            cat |> Option.map (fun p -> offer, p))
                         |> Map.ofList
                         |> Some
                     | Error _ -> None

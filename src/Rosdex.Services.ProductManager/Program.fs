@@ -64,7 +64,7 @@ module CategoryPredictionJobSubscriber =
 
     let handler categoryPredictionEndpoint =
         categoryPredictionEndpoint
-        |> CategoryPredictionService.Client.JsonStub.create
+        |> CategoryPredictionService.Client.AgentBased.create
         |> CommandHandler.ofCategoryPredictionServiceClient
 
     let agent handler =
@@ -102,8 +102,9 @@ module CategoryPredictionJobSubscriber =
                     match job.State with
                     | State.Created _ ->
                         Some SendToCategoryPrediction
-                    | State.JobInCategoryPrediction _ ->
-                        Some FetchCategoryPredictionResult
+                    // TODO Check!
+                    //| State.JobInCategoryPrediction _ ->
+                    //    Some FetchCategoryPredictionResult
                     | _ -> None
                     // Если Job, то при малом интервале начинает забивать задачами с устаревшими данными
                     |> Option.map (fun p -> job.Info.Id, p))

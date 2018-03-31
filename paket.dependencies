@@ -18,3 +18,4 @@ nuget Microsoft.AspNetCore.TestHost
 
 nuget Microsoft.FSharpLu.Json
 nuget Http.fs
+github Rosdex/parser Rosdex.Parser/src/Rosdex.Parser/Csv.fs

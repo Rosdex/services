@@ -1359,3 +1359,6 @@ NUGET
       xunit.extensibility.core (2.3.1) - restriction: >= netstandard1.1
     xunit.runner.visualstudio (2.3.1)
       Microsoft.NET.Test.Sdk (>= 15.0) - restriction: >= netcoreapp1.0
+GITHUB
+  remote: Rosdex/parser
+    Rosdex.Parser/src/Rosdex.Parser/Csv.fs (1454a48463c7ad0b5b3c5c4a7b40a4b834921eb7)

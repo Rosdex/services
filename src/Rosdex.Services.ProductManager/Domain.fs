@@ -84,9 +84,9 @@ module CardsBuilding =
 
     // TODO: Error
     type CommandHandler = {
-        SendToCategoryPrediction :
+        TrySendToCategoryPrediction :
             Offer list
-                -> CategoryPrediction.JobId Async
+                -> CategoryPrediction.JobId option Async
         TryFetchCategoryPredictionResult :
             CategoryPrediction.JobId
                 -> Map<OfferId, CategoryId> option Async
@@ -105,11 +105,14 @@ module CardsBuilding =
             | Created job ->
                 let! id =
                     job.Input
-                    |> commandHanlder.SendToCategoryPrediction
-                return Ok <| JobInCategoryPrediction {
-                    InProcess = job.Input
-                    PredictionId = id
-                    }
+                    |> commandHanlder.TrySendToCategoryPrediction
+                return
+                    Result.ofOption "Cannot send to predict." id
+                    |> Result.map (fun id ->
+                        JobInCategoryPrediction {
+                            InProcess = job.Input
+                            PredictionId = id
+                        })
             | _ ->
                 return
                     state
@@ -149,3 +152,7 @@ module CardsBuilding =
                 handleSendToCategoryPrediction commandHandler state
             | FetchCategoryPredictionResult ->
                 handleFetchCategoryPredictionResult commandHandler state
+
+    type CommandHandler with
+        member this.Handle state command =
+            CommandHandler.handle this state command

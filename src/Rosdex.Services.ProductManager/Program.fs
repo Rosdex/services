@@ -55,6 +55,71 @@ let webApp =
         setStatusCode 404 >=> text "Not Found"
     ]
 
+module CategoryPredictionJobSubscriber =
+    open Domain.CardsBuilding
+
+    module Default =
+        let categoryPredictionJobsEndpoint =
+            "http://localhost:58888/jobs"
+
+    let handler categoryPredictionEndpoint =
+        categoryPredictionEndpoint
+        |> CategoryPredictionService.Client.JsonStub.create
+        |> CommandHandler.ofCategoryPredictionServiceClient
+
+    let agent handler =
+        MailboxProcessor.Start (fun inbox ->
+            let rec loop () = async {
+                let! id, command = inbox.Receive()
+                try
+                    // TODO: Заменить на TryUpdate
+                    // За время обработки предыдущих сообшений job могут изменить свое состояние.
+                    let! job = jobStorageApi.TryGet id
+                    match job with
+                    | Some p ->
+                        let! result = CommandHandler.handle handler p.State command
+                        match result with
+                        | Ok p ->
+                            let! _ = jobStorageApi.TryUpdate id p
+                            ()
+                        | Error p -> printfn "Error in handle command: %s" p
+                    | None ->
+                        printfn "Job %O is not found." id
+                with
+                    | ex -> printfn "%s" ex.Message
+                return! loop ()
+            }
+            loop ()
+        )
+
+    let rec loop intervalMs (agent : MailboxProcessor<_>) =
+        async {
+            do! Async.Sleep intervalMs
+            try
+                let! jobs = jobStorageApi.GetAll ()
+                jobs
+                |> List.choose (fun job ->
+                    match job.State with
+                    | State.Created _ ->
+                        Some SendToCategoryPrediction
+                    | State.JobInCategoryPrediction _ ->
+                        Some FetchCategoryPredictionResult
+                    | _ -> None
+                    // Если Job, то при малом интервале начинает забивать задачами с устаревшими данными
+                    |> Option.map (fun p -> job.Info.Id, p))
+                |> List.map (fun p -> printfn "%A" p; p)
+                |> List.iter agent.Post
+            with
+                | ex -> printfn "%s" ex.Message
+            return! loop intervalMs agent
+        }
+
+    let build intervalMs categoryPredictionEndpoint =
+        categoryPredictionEndpoint
+        |> handler
+        |> agent
+        |> loop intervalMs
+
 // ---------------------------------
 // Error handler
 // ---------------------------------
@@ -68,7 +133,7 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 // ---------------------------------
 
 let configureCors (builder : CorsPolicyBuilder) =
-    builder.WithOrigins("http://localhost:8080")
+    builder.WithOrigins("http://localhost:54496") // Из launchSettings.json
            .AllowAnyMethod()
            .AllowAnyHeader()
            |> ignore
@@ -107,7 +172,17 @@ let configureLogging (builder : ILoggingBuilder) =
     builder.AddFilter(filter).AddConsole().AddDebug() |> ignore
 
 [<EntryPoint>]
-let main _ =
+let main args =
+    args
+        |> Seq.pairwise
+        |> Seq.tryFind (fst >> String.equalsCaseInsensitive "-cpje")
+        |> Option.map snd
+        |> Option.defaultValue CategoryPredictionJobSubscriber.Default.categoryPredictionJobsEndpoint
+        |> fun p ->
+            printfn "Category prediction service jobs endpoint: %s" p;
+            p
+        |> CategoryPredictionJobSubscriber.build (10 * 1000)
+        |> Async.Start
     WebHostBuilder()
         .UseKestrel()
         .UseIISIntegration()

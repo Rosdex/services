@@ -15,6 +15,7 @@
     <Compile Include="HttpHandlers.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <None Include="paket.references" />
     <None Include="web.config" CopyToOutputDirectory="PreserveNewest" />

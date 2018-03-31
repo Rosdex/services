@@ -110,7 +110,8 @@ module CategoryPredictionService =
     type Error =
         | JobNotFound
         | ResultIsNotReady
-        | NetError of StatusCode : int
+        | ResponseError of StatusCode : int
+        | Exception of System.Exception // TODO: ?
         | FormatError
 
     type Client = {
@@ -191,48 +192,54 @@ module CategoryPredictionService =
             let handleNetError (response : Response) =
                 match response.statusCode with
                 | 200 -> Ok response
-                | p -> p |> NetError |> Error
+                | p -> p |> ResponseError |> Error
 
             let tryExtractJob =
                 JobSchema.tryExtract
                 >> Result.map JobSchema.toJob
 
             let tryInitJob endpoint offers = async {
-                use! response =
+                let! response =
                     Request.createUrl Post endpoint
                     // TODO: SCV
                     |> Request.bodyString (Compact.serialize offers)
-                    |> getResponse
+                    |> tryGetResponse
                     |> Job.toAsync
                 return
                     response
-                    |> handleNetError
+                    |> Result.ofChoice
+                    |> Result.mapError (fun p -> Exception p)
+                    |> Result.bind handleNetError
                     |> Result.bind tryExtractJob
                 }
 
             let tryGetJob endpoint (id : JobId) = async {
-                use! response =
+                let! response =
                     id
                     |> sprintf "%s/%O" endpoint
                     |> Request.createUrl Get
-                    |> getResponse
+                    |> tryGetResponse
                     |> Job.toAsync
                 return
                     response
-                    |> handleNetError
+                    |> Result.ofChoice
+                    |> Result.mapError (fun p -> Exception p)
+                    |> Result.bind handleNetError
                     |> Result.bind tryExtractJob
                 }
 
             let tryGetResult endpoint (id : JobId) = async {
-                use! response =
+                let! response =
                     id
                     |> sprintf "%s/%O/result" endpoint
                     |> Request.createUrl Get
-                    |> getResponse
+                    |> tryGetResponse
                     |> Job.toAsync
                 return
                     response
-                    |> handleNetError
+                    |> Result.ofChoice
+                    |> Result.mapError (fun p -> Exception p)
+                    |> Result.bind handleNetError
                     |> Result.bind (fun p ->
                         p.body
                         |> Compact.tryDeserializeStream
@@ -268,13 +275,12 @@ module CommandHandler =
     // TODO: Bubble Error
     let ofCategoryPredictionServiceClient client : CommandHandler =
         {
-            SendToCategoryPrediction = fun offers -> async {
+            TrySendToCategoryPrediction = fun offers -> async {
                 let! job = client.TryInit offers
                 return
                     match job with
-                    | Ok p -> p.Info.Id
-                    | Error p ->
-                        failwithf "Not implemented yet. %A" p
+                    | Ok p -> Some p.Info.Id
+                    | Error _ -> None
             }
             TryFetchCategoryPredictionResult = fun id -> async {
                 let! result = client.TryGetResult id

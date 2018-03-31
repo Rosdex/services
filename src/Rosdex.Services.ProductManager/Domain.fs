@@ -35,17 +35,30 @@ module Job =
 
     let state { Job.State = state } = state
 
+// Category prediction service
+
+module CategoryPrediction =
+    type JobId = System.Guid
+
+    type State =
+        | Created
+        | Performing
+        | Done
+        | Error
+
+    type Job =  State Job
+
+// Cards building
+
 module CardsBuilding =
 
     type CreatedJob = {
         Input : Offer list
     }
 
-    type CategoryPredictionJobId = System.Guid
-
     type InCategoryPredictionJob = {
         InProcess : Offer list
-        PredictionId : CategoryPredictionJobId
+        PredictionId : CategoryPrediction.JobId
         //Processed : (Offer * CategoryId option) list
     }
 
@@ -60,13 +73,6 @@ module CardsBuilding =
         | JobWithPredictedCategory of CategoryPredictedJob
         | Failed of JobInfo * Message : string
 
-    //module State =
-    //    let job = function
-    //        | Created p -> p.Job
-    //        | JobInCategoryPrediction p -> p.Job
-    //        | JobWithPredictedCategory p -> p.Job
-    //        | Failed (p, _) -> p
-
     type Job = State Job
 
     //// TODO? Events?
@@ -79,10 +85,10 @@ module CardsBuilding =
     type CommandHandler = {
         SendToCategoryPrediction :
             Offer list
-                -> CategoryPredictionJobId Async
-        FetchCategoryPredictionResult :
-            CategoryPredictionJobId
-                -> Map<OfferId, CategoryId> Async
+                -> CategoryPrediction.JobId Async
+        TryFetchCategoryPredictionResult :
+            CategoryPrediction.JobId
+                -> Map<OfferId, CategoryId> option Async
     }
 
     type Command =
@@ -100,16 +106,16 @@ module CardsBuilding =
                     let! id =
                         job.Input
                         |> commandHanlder.SendToCategoryPrediction
-                    return JobInCategoryPrediction {
+                    return Ok <| JobInCategoryPrediction {
                         InProcess = job.Input
                         PredictionId = id
                         }
                     }
-                |> Ok
             | _ ->
                 state
                 |> sprintf """State (%A) must be "Created"."""
                 |> Error
+                |> async.Return
 
         // TODO
         // ? Лишние OfferId в map
@@ -120,18 +126,23 @@ module CardsBuilding =
                 async {
                     let! map =
                         p.PredictionId
-                        |> commandHandler.FetchCategoryPredictionResult
-                    return JobWithPredictedCategory {
-                        PredictedOffers =
-                            p.InProcess
-                            |> List.map (fun p ->
-                                p, p.Id |> map.TryFind)
-                    }}
-                |> Ok
+                        |> commandHandler.TryFetchCategoryPredictionResult
+                    match map with
+                    | Some map ->
+                        return Ok <| JobWithPredictedCategory {
+                            PredictedOffers =
+                                p.InProcess
+                                |> List.map (fun p ->
+                                    p, p.Id |> map.TryFind)
+                            }
+                    | None ->
+                        return Error ""
+                    }
             | _ ->
                 state
                 |> sprintf """State (%A) must be "JobInCategoryPrediction"."""
                 |> Error
+                |> async.Return
 
         let handle commandHandler state command =
             match command with

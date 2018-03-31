@@ -36,7 +36,7 @@ module HttpHandlers =
             let handleGetProduct storageApi id : HttpHandler =
                 fun next ctx -> task {
                     let! response =
-                        storageApi.TryGet id
+                        storageApi.TryGetJob id
                         |> Async.StartAsTask
                     match response with
                     | Some p ->

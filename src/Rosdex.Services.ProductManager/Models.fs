@@ -103,3 +103,65 @@ module JobStorageApi =
                 loop initDict)
 
         let create = agent >> ofAgent
+
+type CategoryPredictionServiceClient = {
+    Init :
+        Offer list
+        -> CategoryPrediction.Job Async
+    TryGetJob :
+        CategoryPrediction.JobId
+        -> CategoryPrediction.Job option Async
+    TryGetResult :
+        CategoryPrediction.JobId
+        -> (OfferId * CategoryId option) list option Async
+}
+
+module CategoryPredictionServiceClient =
+    open CategoryPrediction
+
+    module AgentBased =
+        open AgentHelpers
+
+        type AgentMessage =
+            | Init of
+                twoWay<Offer list, Job>
+            | TryGetJob of
+                twoWay<JobId, Job option>
+            | TryGetResult of
+                twoWay<JobId, (OfferId * CategoryId option) list option>
+
+        let ofAgent (agent : MailboxProcessor<_>) =
+            let tuple a b = a, b
+            {
+                Init = fun offers ->
+                    tuple offers
+                    >> Init
+                    |> agent.PostAndAsyncReply
+                TryGetJob = fun id ->
+                    tuple id
+                    >> TryGetJob
+                    |> agent.PostAndAsyncReply
+                TryGetResult = fun id ->
+                    tuple id
+                    >> TryGetResult
+                    |> agent.PostAndAsyncReply
+            }
+
+module CommandHandler =
+    open Rosdex.Services.ProductManager.Domain.CardsBuilding
+
+    let ofCategoryPredictionServiceClient client : CommandHandler =
+        {
+            SendToCategoryPrediction = fun offers -> async {
+                let! job = client.Init offers
+                return job.Info.Id
+            }
+            TryFetchCategoryPredictionResult = fun id -> async {
+                let! result = client.TryGetResult id
+                return result
+                    |> Option.map (
+                        List.choose (fun (offer, cat) ->
+                            cat |> Option.map (fun p -> offer, p))
+                        >> Map.ofList)
+            }
+        }

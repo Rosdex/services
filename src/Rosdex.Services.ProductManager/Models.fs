@@ -320,6 +320,13 @@ module CommandHandler =
                     | Ok p -> Some p
                     | Error _ -> None
             }
+            TryCheckCategoryPrediction = fun id -> async {
+                let! job = client.TryGetJob id
+                return
+                    match job with
+                    | Ok p -> Some p
+                    | Error _ -> None
+            }
             TryFetchCategoryPredictionResult = fun id -> async {
                 let! result = client.TryGetResult id
                 return

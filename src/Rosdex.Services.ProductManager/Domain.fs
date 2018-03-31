@@ -40,6 +40,7 @@ module Job =
 module CategoryPrediction =
     type JobId = System.Guid
 
+    [<RequireQualifiedAccess>]
     type State =
         | Created
         | Performing
@@ -99,50 +100,48 @@ module CardsBuilding =
     // TODO
     // Развернуть Errors
     module CommandHandler =
-        let handleSendToCategoryPrediction commandHanlder state =
+        let handleSendToCategoryPrediction commandHanlder state = async {
             match state with
             | Created job ->
-                async {
-                    let! id =
-                        job.Input
-                        |> commandHanlder.SendToCategoryPrediction
-                    return Ok <| JobInCategoryPrediction {
-                        InProcess = job.Input
-                        PredictionId = id
-                        }
+                let! id =
+                    job.Input
+                    |> commandHanlder.SendToCategoryPrediction
+                return Ok <| JobInCategoryPrediction {
+                    InProcess = job.Input
+                    PredictionId = id
                     }
             | _ ->
-                state
-                |> sprintf """State (%A) must be "Created"."""
-                |> Error
-                |> async.Return
+                return
+                    state
+                    |> sprintf """State (%A) must be "Created"."""
+                    |> Error
+            }
 
         // TODO
         // ? Лишние OfferId в map
         // ? Частичная обработка
-        let handleFetchCategoryPredictionResult commandHandler state =
+        let handleFetchCategoryPredictionResult commandHandler state = async {
             match state with
             | JobInCategoryPrediction p ->
-                async {
-                    let! map =
-                        p.PredictionId
-                        |> commandHandler.TryFetchCategoryPredictionResult
-                    match map with
-                    | Some map ->
-                        return Ok <| JobWithPredictedCategory {
-                            PredictedOffers =
-                                p.InProcess
-                                |> List.map (fun p ->
-                                    p, p.Id |> map.TryFind)
-                            }
-                    | None ->
-                        return Error ""
-                    }
+                let! map =
+                    p.PredictionId
+                    |> commandHandler.TryFetchCategoryPredictionResult
+                match map with
+                | Some map ->
+                    return Ok <| JobWithPredictedCategory {
+                        PredictedOffers =
+                            p.InProcess
+                            |> List.map (fun p ->
+                                p, p.Id |> map.TryFind)
+                        }
+                | None ->
+                    return Error ""
             | _ ->
-                state
-                |> sprintf """State (%A) must be "JobInCategoryPrediction"."""
-                |> Error
-                |> async.Return
+                return
+                    state
+                    |> sprintf """State (%A) must be "JobInCategoryPrediction"."""
+                    |> Error
+            }
 
         let handle commandHandler state command =
             match command with

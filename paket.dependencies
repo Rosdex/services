@@ -17,3 +17,4 @@ nuget xunit.runner.visualstudio
 nuget Microsoft.AspNetCore.TestHost
 
 nuget Microsoft.FSharpLu.Json
+nuget Http.fs

@@ -9,3 +9,4 @@ Microsoft.Extensions.DependencyInjection
 Giraffe
 
 Microsoft.FSharpLu.Json
+Http.fs

@@ -174,6 +174,9 @@ let configureLogging (builder : ILoggingBuilder) =
         | _ -> false
     builder.AddFilter(filter).AddConsole().AddDebug() |> ignore
 
+open Microsoft.Extensions.Configuration
+open System.IO
+
 [<EntryPoint>]
 let main args =
     args
@@ -186,9 +189,15 @@ let main args =
             p
         |> CategoryPredictionJobSubscriber.build (10 * 1000)
         |> Async.Start
+    let config =
+        ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("hosting.json", true)
+            .Build()
     WebHostBuilder()
         .UseKestrel()
         .UseIISIntegration()
+        .UseConfiguration(config)
         .Configure(Action<IApplicationBuilder> configureApp)
         .ConfigureServices(configureServices)
         .ConfigureLogging(configureLogging)

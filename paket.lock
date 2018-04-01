@@ -232,15 +232,19 @@ NUGET
       System.Runtime.Extensions (>= 4.1) - restriction: && (< net45) (>= netstandard1.3)
       System.Runtime.InteropServices (>= 4.1) - restriction: && (< net45) (>= netstandard1.3)
       System.Runtime.InteropServices.RuntimeInformation (>= 4.0) - restriction: && (< net45) (>= netstandard1.3)
-    Microsoft.Extensions.Configuration (2.0) - restriction: >= netstandard2.0
-      Microsoft.Extensions.Configuration.Abstractions (>= 2.0) - restriction: >= netstandard2.0
-    Microsoft.Extensions.Configuration.Abstractions (2.0) - restriction: >= netstandard2.0
+    Microsoft.Extensions.Configuration (2.0.1) - restriction: >= netstandard2.0
+      Microsoft.Extensions.Configuration.Abstractions (>= 2.0.1) - restriction: >= netstandard2.0
+    Microsoft.Extensions.Configuration.Abstractions (2.0.1) - restriction: >= netstandard2.0
       Microsoft.Extensions.Primitives (>= 2.0) - restriction: >= netstandard2.0
     Microsoft.Extensions.Configuration.EnvironmentVariables (2.0) - restriction: >= netstandard2.0
       Microsoft.Extensions.Configuration (>= 2.0) - restriction: >= netstandard2.0
-    Microsoft.Extensions.Configuration.FileExtensions (2.0) - restriction: >= netstandard2.0
-      Microsoft.Extensions.Configuration (>= 2.0) - restriction: >= netstandard2.0
-      Microsoft.Extensions.FileProviders.Physical (>= 2.0) - restriction: >= netstandard2.0
+    Microsoft.Extensions.Configuration.FileExtensions (2.0.1) - restriction: >= netstandard2.0
+      Microsoft.Extensions.Configuration (>= 2.0.1) - restriction: >= netstandard2.0
+      Microsoft.Extensions.FileProviders.Physical (>= 2.0.1) - restriction: >= netstandard2.0
+    Microsoft.Extensions.Configuration.Json (2.0.1)
+      Microsoft.Extensions.Configuration (>= 2.0.1) - restriction: >= netstandard2.0
+      Microsoft.Extensions.Configuration.FileExtensions (>= 2.0.1) - restriction: >= netstandard2.0
+      Newtonsoft.Json (>= 10.0.1) - restriction: >= netstandard2.0
     Microsoft.Extensions.DependencyInjection (2.0)
       Microsoft.Extensions.DependencyInjection.Abstractions (>= 2.0) - restriction: >= netstandard2.0
     Microsoft.Extensions.DependencyInjection.Abstractions (2.0) - restriction: >= netstandard2.0
@@ -250,12 +254,12 @@ NUGET
       System.Diagnostics.Debug (>= 4.0.11) - restriction: || (&& (< net451) (>= netstandard1.3) (< netstandard1.6)) (&& (< net451) (>= netstandard1.6))
       System.Dynamic.Runtime (>= 4.0.11) - restriction: || (&& (< net451) (>= netstandard1.3) (< netstandard1.6)) (&& (< net451) (>= netstandard1.6))
       System.Linq (>= 4.1) - restriction: || (&& (< net451) (>= netstandard1.3) (< netstandard1.6)) (&& (< net451) (>= netstandard1.6))
-    Microsoft.Extensions.FileProviders.Abstractions (2.0) - restriction: >= netstandard2.0
+    Microsoft.Extensions.FileProviders.Abstractions (2.0.1) - restriction: >= netstandard2.0
       Microsoft.Extensions.Primitives (>= 2.0) - restriction: >= netstandard2.0
-    Microsoft.Extensions.FileProviders.Physical (2.0) - restriction: >= netstandard2.0
-      Microsoft.Extensions.FileProviders.Abstractions (>= 2.0) - restriction: >= netstandard2.0
-      Microsoft.Extensions.FileSystemGlobbing (>= 2.0) - restriction: >= netstandard2.0
-    Microsoft.Extensions.FileSystemGlobbing (2.0) - restriction: >= netstandard2.0
+    Microsoft.Extensions.FileProviders.Physical (2.0.1) - restriction: >= netstandard2.0
+      Microsoft.Extensions.FileProviders.Abstractions (>= 2.0.1) - restriction: >= netstandard2.0
+      Microsoft.Extensions.FileSystemGlobbing (>= 2.0.1) - restriction: >= netstandard2.0
+    Microsoft.Extensions.FileSystemGlobbing (2.0.1) - restriction: >= netstandard2.0
     Microsoft.Extensions.Hosting.Abstractions (2.0.1) - restriction: >= netstandard2.0
     Microsoft.Extensions.Logging (2.0) - restriction: >= netstandard2.0
       Microsoft.Extensions.DependencyInjection.Abstractions (>= 2.0) - restriction: >= netstandard2.0

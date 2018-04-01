@@ -8,6 +8,7 @@ Microsoft.Extensions.Logging.Debug
 Microsoft.Extensions.DependencyInjection
 Giraffe
 
+Microsoft.Extensions.Configuration.Json
 Microsoft.FSharpLu.Json
 Http.fs
 File: Csv.fs

@@ -18,14 +18,11 @@ type JobStorageApi = {
         JobId -> Job option Async
     CreateNew :
         Offer list -> Job Async
-    // TODO:
-    // ? Заменить на TryApply :
-    //      JobId
-    //      -> (CardBuilding.State -> CardBuilding.State)
-    //      -> CardBuilding.Job option Async
+    TryApply :
+        JobId -> (State -> State Async) -> Job option Async
     TryUpdate :
         // TODO: Error
-        JobId -> CardsBuilding.State -> CardsBuilding.Job option Async
+        JobId -> State -> Job option Async
 }
 
 module AgentHelpers =
@@ -42,6 +39,7 @@ module JobStorageApi =
             | GetAll of oneWayFrom<Job list>
             | TryGet of twoWay<JobId, Job option>
             | CreateNew of twoWay<Offer list, Job>
+            | TryApply of twoWay<JobId * (State -> State Async), Job option>
             | TryUpdate of twoWay<JobId * State, Job option>
 
         let ofAgent (agent : MailboxProcessor<_>) =
@@ -52,6 +50,8 @@ module JobStorageApi =
                     agent.PostAndAsyncReply (tuple id >> TryGet)
                 CreateNew = fun offers ->
                     agent.PostAndAsyncReply (tuple offers >> CreateNew)
+                TryApply = fun id applying ->
+                    agent.PostAndAsyncReply (tuple (id, applying) >> TryApply)
                 TryUpdate = fun id state ->
                     agent.PostAndAsyncReply (tuple (id, state) >> TryUpdate)
             }
@@ -66,12 +66,12 @@ module JobStorageApi =
                     |> Map.toList
                     |> List.map snd
                     |> rc.Reply
-                dict
+                dict |> async.Return
             | TryGet (id, rc) ->
                 dict
                     |> Map.tryFind id
                     |> rc.Reply
-                dict
+                dict |> async.Return
             | CreateNew (offers, rc) ->
                 let result =
                     {
@@ -81,9 +81,19 @@ module JobStorageApi =
                         State = State.Created { Input = offers }
                     }
                 rc.Reply result
-                result
-                    |> Map.add result.Info.Id
-                    <| dict
+                dict.Add (result.Info.Id, result)
+                    |> async.Return
+            | TryApply ((id, applying), rc) ->
+                dict.TryFind id
+                    |> Option.map (fun job -> async {
+                        let! newState = applying job.State
+                        let result = {
+                            job with State = newState
+                        }
+                        rc.Reply (Some result)
+                        return Map.add id result dict
+                    })
+                    |> Option.defaultValue (async.Return dict)
             | TryUpdate ((id, state), rc) ->
                 dict.TryFind id
                     |> Option.map (fun p ->
@@ -91,14 +101,14 @@ module JobStorageApi =
                         rc.Reply (Some result)
                         Map.add id result dict)
                     |> Option.defaultValue dict
+                    |> async.Return
 
         let agent initDict =
             MailboxProcessor.Start (fun inbox ->
                 let rec loop dict = async {
                     let! message = inbox.Receive()
-                    return!
-                        apply dict message
-                        |> loop
+                    let! dict =  apply dict message
+                    return! loop dict
                     }
                 loop initDict)
 
@@ -318,14 +328,14 @@ module CommandHandler =
                 return
                     match job with
                     | Ok p -> Some p
-                    | Error _ -> None
+                    | Error err -> printfn "%A" err; None
             }
             TryCheckCategoryPrediction = fun id -> async {
                 let! job = client.TryGetJob id
                 return
                     match job with
                     | Ok p -> Some p
-                    | Error _ -> None
+                    | Error err -> printfn "%A" err; None
             }
             TryFetchCategoryPredictionResult = fun id -> async {
                 let! result = client.TryGetResult id
@@ -335,6 +345,6 @@ module CommandHandler =
                         predicted
                         |> Map.ofList
                         |> Some
-                    | Error _ -> None
+                    | Error err -> printfn "%A" err; None
             }
         }

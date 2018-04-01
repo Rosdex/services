@@ -72,17 +72,15 @@ module CategoryPredictionJobSubscriber =
             let rec loop () = async {
                 let! id, command = inbox.Receive()
                 try
-                    // TODO: Заменить на TryUpdate
-                    // За время обработки предыдущих сообшений job могут изменить свое состояние.
-                    let! job = jobStorageApi.TryGet id
+                    let! job = jobStorageApi.TryApply id (fun state -> async {
+                        let! result = CommandHandler.handle handler command state
+                        return
+                            match result with
+                            | Ok newState -> newState
+                            | Error p -> printfn "%A" p; state
+                        })
                     match job with
-                    | Some p ->
-                        let! result = CommandHandler.handle handler p.State command
-                        match result with
-                        | Ok p ->
-                            let! _ = jobStorageApi.TryUpdate id p
-                            ()
-                        | Error p -> printfn "Error in handle command: %s" p
+                    | Some _ -> ()
                     | None ->
                         printfn "Job %O is not found." id
                 with

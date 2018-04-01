@@ -172,7 +172,7 @@ module CardsBuilding =
                     |> Error
             }
 
-        let handle commandHandler state command =
+        let handle commandHandler command state=
             (match command with
             | SendToCategoryPrediction ->
                 handleSendToCategoryPrediction
@@ -183,5 +183,5 @@ module CardsBuilding =
                 commandHandler state
 
     type CommandHandler with
-        member this.Handle state command =
-            CommandHandler.handle this state command
+        member this.Handle command state =
+            CommandHandler.handle this command state 

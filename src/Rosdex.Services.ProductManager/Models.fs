@@ -118,11 +118,11 @@ module CategoryPredictionService =
     open CategoryPrediction
 
     type Error =
-        | JobNotFound
+        | JobNotFound of JobId
         | ResultIsNotReady
         | ResponseError of StatusCode : int
         | Exception of System.Exception // TODO: ?
-        | FormatError
+        | FormatError of string
 
     type Client = {
         TryInit :
@@ -193,7 +193,7 @@ module CategoryPredictionService =
                     |> List.iter (
                         CsvWriter.tryStringifyItem offerCsvWriter
                         >> function
-                            | Ok p -> stream.Write p
+                            | Ok p -> stream.WriteLine p
                             | Error _ -> ())
 
                 // TODO: ?
@@ -201,28 +201,45 @@ module CategoryPredictionService =
                     use reader = new System.IO.StreamReader(stream)
                     try
                         [
-                            while reader.EndOfStream do
+                            while not reader.EndOfStream do
                                 match reader.ReadLine() |> String.split ',' |> List.map int with
                                 | [id; categoryId] -> yield id, categoryId
-                                | _ -> failwith "Wrong format!"
+                                | _ -> failwith "Wrong csv format!"
                         ]
+                        // Ошибка ли это?
+                        |> fun p ->
+                            match p with
+                            | [] -> printfn "Ooops, empty list!"; p
+                            | _ -> p
                         |> Ok
                     with
                         | ex -> Error ex.Message
 
             type JobSchema = {
-                id : System.Guid
-                status : State
+                [<Newtonsoft.Json.JsonRequired>] uuid : System.Guid
+                [<Newtonsoft.Json.JsonRequired>] status : State
                 created_at : System.DateTime
                 // ..
             }
 
             module JobSchema =
+                open Newtonsoft.Json
+
+                type IgnoreMissingMember =
+                    static member settings =
+                        let r = Compact.Internal.Settings.settings
+                        r.MissingMemberHandling <- MissingMemberHandling.Ignore
+                        r
+                    static member formatting =
+                        Compact.Internal.Settings.formatting
+
+                type IMM = With<IgnoreMissingMember>
+
                 let toJob schema =
                     {
                         Info =
                             {
-                                Id = schema.id
+                                Id = schema.uuid
                                 CreatedAt = schema.created_at
                             }
                         State = schema.status
@@ -230,9 +247,14 @@ module CategoryPredictionService =
 
                 let tryExtract (response : Response) =
                     response.body
-                    |> Compact.tryDeserializeStream<JobSchema> |> function
+                    |> IMM.tryDeserializeStream<JobSchema> |> function
                         | Choice1Of2 p -> Ok p
-                        | _ -> Error FormatError
+                        | Choice2Of2 p -> Error (FormatError p)
+
+            let handleNotFound id (response : Response) =
+                match response.statusCode with
+                | 404 -> Error (JobNotFound id)
+                | _ -> Ok response
 
             let handleNetError (response : Response) =
                 match response.statusCode with
@@ -245,13 +267,20 @@ module CategoryPredictionService =
 
             let tryInitJob endpoint offers = async {
                 let! response =
-                    Request.createUrl Post endpoint
+                    endpoint
+                    |> Request.createUrl Post
                     // TODO: Send stream
-                    |> Request.bodyString (
-                        let stream = new System.IO.StringWriter()
-                        CsvOffers.serialize (stream) offers
-                        stream.ToString()
-                        )
+                    |> Request.body (
+                        let str =
+                            let stream = new System.IO.StringWriter()
+                            CsvOffers.serialize stream offers
+                            stream.ToString()
+                        BodyForm [
+                            FormFile ("file",
+                                ("file.csv",
+                                    ContentType.create ("application", "vnd.ms-excel"),
+                                    FileData.Plain str))
+                        ])
                     |> tryGetResponse
                     |> Job.toAsync
                 return
@@ -265,7 +294,7 @@ module CategoryPredictionService =
             let tryGetJob endpoint (id : JobId) = async {
                 let! response =
                     id
-                    |> sprintf "%s/%O" endpoint
+                    |> sprintf "%s%O" endpoint
                     |> Request.createUrl Get
                     |> tryGetResponse
                     |> Job.toAsync
@@ -273,6 +302,7 @@ module CategoryPredictionService =
                     response
                     |> Result.ofChoice
                     |> Result.mapError (fun p -> Exception p)
+                    |> Result.bind (handleNotFound id)
                     |> Result.bind handleNetError
                     |> Result.bind tryExtractJob
                 }
@@ -280,7 +310,7 @@ module CategoryPredictionService =
             let tryGetResult endpoint (id : JobId) = async {
                 let! response =
                     id
-                    |> sprintf "%s/%O/result" endpoint
+                    |> sprintf "%s%O/result" endpoint
                     |> Request.createUrl Get
                     |> tryGetResponse
                     |> Job.toAsync
@@ -288,11 +318,13 @@ module CategoryPredictionService =
                     response
                     |> Result.ofChoice
                     |> Result.mapError (fun p -> Exception p)
+                    // TODO: not ready
+                    |> Result.bind (handleNotFound id)
                     |> Result.bind handleNetError
                     |> Result.bind (fun p ->
                         p.body
                         |> CsvOffers.tryExtract
-                        |> Result.mapError (fun _ -> FormatError))
+                        |> Result.mapError FormatError)
                 }
 
             let agent endpoint = MailboxProcessor.Start (fun inbox ->
@@ -322,29 +354,24 @@ module CommandHandler =
 
     // TODO: Bubble Error
     let ofCategoryPredictionServiceClient client : CommandHandler =
+        let handleError result =
+            match result with
+            | Ok p -> Some p
+            | Error err -> printfn "%A" err; None
         {
             TrySendToCategoryPrediction = fun offers -> async {
                 let! job = client.TryInit offers
-                return
-                    match job with
-                    | Ok p -> Some p
-                    | Error err -> printfn "%A" err; None
+                return job |> handleError
             }
             TryCheckCategoryPrediction = fun id -> async {
                 let! job = client.TryGetJob id
-                return
-                    match job with
-                    | Ok p -> Some p
-                    | Error err -> printfn "%A" err; None
+                return job |> handleError
             }
             TryFetchCategoryPredictionResult = fun id -> async {
                 let! result = client.TryGetResult id
                 return
-                    match result with
-                    | Ok predicted ->
-                        predicted
-                        |> Map.ofList
-                        |> Some
-                    | Error err -> printfn "%A" err; None
+                    result
+                    |> handleError
+                    |> Option.map Map.ofList
             }
         }

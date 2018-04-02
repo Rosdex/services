@@ -24,7 +24,7 @@ $ ./build.sh
 
 After a successful build you can start the web application by executing the following command in your terminal:
 
-* -cpje - Category Prediction Jobs Endpoint - необязательный аргумент (дефолт: http://localhost:58888/jobs).
+* -cpje - Category Prediction Jobs Endpoint - необязательный аргумент (дефолт: http://localhost:5001/jobs).
 
 ```
 dotnet run src/Rosdex.Services.ProductManager -cpje "http://localhost:5001/jobs"

@@ -63,8 +63,13 @@ module CardsBuilding =
         //Processed : (Offer * CategoryId option) list
     }
 
+    type CategoryPredictedOffer = {
+        Offer : Offer
+        PredictedCategory : CategoryId option
+    }
+
     type CategoryPredictedJob = {
-        PredictedOffers : (Offer * CategoryId option) list
+        PredictedOffers : CategoryPredictedOffer list
     }
 
     type State =
@@ -161,7 +166,10 @@ module CardsBuilding =
                         PredictedOffers =
                             job.InProcess
                             |> List.map (fun p ->
-                                p, p.Id |> map.TryFind)
+                                {
+                                    Offer = p
+                                    PredictedCategory = p.Id |> map.TryFind
+                                })
                         }
                 | None ->
                     return Error ""

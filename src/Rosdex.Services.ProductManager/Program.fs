@@ -60,7 +60,7 @@ module CategoryPredictionJobSubscriber =
 
     module Default =
         let categoryPredictionJobsEndpoint =
-            "http://localhost:58888/jobs"
+            "http://localhost:5001/jobs/"
 
     let handler categoryPredictionEndpoint =
         categoryPredictionEndpoint

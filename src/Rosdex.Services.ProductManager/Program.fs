@@ -39,7 +39,7 @@ let logOutput : HttpHandler =
         return result
         }
 
-let jobStorageApi = JobStorageApi.InMemory.create Map.empty
+let jobStorageApi = JobStorage.AgentBased.InMemory.create Map.empty
 
 let webApp =
     logInput
@@ -64,7 +64,7 @@ module CategoryPredictionJobSubscriber =
 
     let handler categoryPredictionEndpoint =
         categoryPredictionEndpoint
-        |> CategoryPredictionService.Client.AgentBased.create
+        |> CategoryPredictionService.AgentBased.create
         |> CommandHandler.ofCategoryPredictionServiceClient
 
     let agent handler =

@@ -19,6 +19,8 @@ module HttpHandlers =
     module ProductsManager =
 
         module CardsBuilding =
+            open JobStorage
+
             let handlePostProducts storageApi offers : HttpHandler =
                 fun next ctx -> task {
                     let! response =
@@ -33,7 +35,7 @@ module HttpHandlers =
                         |> Async.StartAsTask
                     return! json response next ctx
                     }
-            let handleGetProduct (storageApi : JobStorageApi) id : HttpHandler =
+            let handleGetProduct storageApi id : HttpHandler =
                 fun next ctx -> task {
                     let! response =
                         storageApi.TryGet id
